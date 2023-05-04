@@ -1,0 +1,137 @@
+
+// Controla el sensor de color y los servos
+#include<Servo.h>
+Servo servo1; // Servo que mueve al skittle hacia el sensor
+Servo servo2; // Servo de la rampita
+const int S2 = 7; // S2 del sensor de color
+const int S3 = 4; // S3 del sensor de color
+const int colorout = 8; // Salida del pulso del sensor de color
+int color = 0; //Color que sensa de los 5 posibles
+const int reinicio = 9;//boton de reinicio
+int redF = 0;  // Variable que guarda el valor del filtro ROJO
+int greenF = 0;  // Variable que guarda el valor del filtro Verde
+int blueF = 0;  // Variable que guarda el valor del filtro Azul
+int s_rojo[3] = {78, 105, 82}; // Arreglo con los valores RGB del color rojo
+int s_verde[3] = {79, 82, 78}; // Arreglo con los valores RGB del color verde
+int s_morado[3] = {95, 109, 85}; // Arreglo con los valores RGB del color morado
+int s_naranja[3] = {61, 91, 76}; // Arreglo con los valores RGB del color naranja
+int s_amarillo[3] = {56, 69, 72}; // Arreglo con los valores RGB del color amarillo
+int no_s[3] = {75, 81, 61}; // Arreglo con los valores RGB cuando no hay ningun skittle
+int pos_servo1 = 160;
+int pos_servo2 = 90;
+
+
+bool uno = false;
+bool dos = false;
+volatile bool carga = true; // Flag que se activa cuando se quieren cargar los skittle
+void setup() {
+  servo1.attach(5); // Servo1 al pin 5
+  servo2.attach(6); // Servo1 al pin 6
+  pinMode(S2, OUTPUT);
+  pinMode(S3, OUTPUT);
+  pinMode(colorout, INPUT);
+  pinMode(reinicio, INPUT);
+  Serial.begin(9600);
+  servo1.write(pos_servo1);// Pone el servo1 en la posicion inicial
+  servo2.write(pos_servo2);// Pone el servo2 en la posicion inicial
+  delay(1000);
+}
+void loop() {
+  int ninguno = 0;
+  if (digitalRead(reinicio) == LOW){
+    carga = true;
+  }
+  while ( carga == true ) {
+    for (int i = pos_servo1 ; i >= 90 ; i--) {
+      servo1.write(i); // Gira el skittle debajo del sensor
+      delay(8);
+    }
+    pos_servo1 = 90;
+    if ( pos_servo2 >= 90 ) {
+      for (int i = pos_servo2 ; i >= 90 ; i--) { // <- Entra aqui si esta a la derercha de 90
+        servo2.write(i); // Acomoda la rampa en medio
+        delay(8);
+      }
+    }
+    else {
+      for (int i = pos_servo2 ; i <= 90 ; i++) { // <- Entra aqui si esta a la izquierda de 90
+        servo2.write(i); // Acomoda la rampa en medio
+        delay(8);
+      }
+    }
+    pos_servo2 = 90;
+    delay(1500);
+    // Pone el filtro rojo
+    int red_t = 0;
+    digitalWrite(S2, LOW);
+    digitalWrite(S3, LOW);
+    delay(50);
+    for ( int i = 1; i <= 10 ; i++) {
+      redF = pulseIn(colorout, LOW); //Lee la señal R
+      red_t += redF;
+    }
+    redF = red_t / 10;
+
+
+    // Pone el filtro verde
+    int green_t = 0;
+    digitalWrite(S2, HIGH);
+    digitalWrite(S3, HIGH);
+    delay(50);
+    for ( int i = 1; i <= 10 ; i++) {
+      greenF = pulseIn(colorout, LOW); //Lee la señal R
+      green_t += greenF;
+    }
+    greenF = green_t / 10;
+    // Pone el filtro azul
+    int blue_t = 0;
+    digitalWrite(S2, LOW);
+    digitalWrite(S3, HIGH);
+    delay(50);
+    for ( int i = 1; i <= 10 ; i++) {
+      blueF = pulseIn(colorout, LOW); //Lee la señal R
+      blue_t += blueF;
+    }
+    blueF = blue_t / 10;
+
+
+    Serial.print("R = ");
+    Serial.print(redF);
+    Serial.print("  ");
+    Serial.print("G = ");
+    Serial.print(greenF);
+    Serial.print("  ");
+    Serial.print("B = ");
+    Serial.println(blueF);
+    delay(10);
+    // Si el sensor de color no detecta ningun color de skittle tres veces seguidas se sale de la rutina y espera a que el otro arduino le diga que vuelva a recivir
+    if (((redF >= no_s[0] - 5) && (redF <= no_s[0] + 5)) && ((greenF >= no_s[1] - 5) && (greenF <= no_s[1] + 5)) && ((blueF >= no_s[2] - 5) && (blueF <= no_s[2] + 5))) {
+      color = 6;
+      ninguno++;
+      if ( ninguno >= 3 ) {
+        carga = false;
+        Serial.println("sale");
+      }
+    }
+    // Compara los valores del sensor con los que corresponden al skittle rojo
+    if (((redF >= s_rojo[0] - 5) && (redF <= s_rojo[0] + 5)) && ((greenF >= s_rojo[1] - 5) && (greenF <= s_rojo[1] + 5)) && ((blueF >= s_rojo[2] - 5) && (blueF <= s_rojo[2] + 5))) {
+      color = 1;
+    }
+    // Compara los valores del sensor con los que corresponden al skittle verde
+    if (((redF >= s_verde[0] - 5) && (redF <= s_verde[0] + 5)) && ((greenF >= s_verde[1] - 5) && (greenF <= s_verde[1] + 5)) && ((blueF >= s_verde[2] - 5) && (blueF <= s_verde[2] + 5))) {
+      color = 2;
+    }
+    // Compara los valores del sensor con los que corresponden al skittle amarillo
+    if (((redF >= s_amarillo[0] - 5) && (redF <= s_amarillo[0] + 5)) && ((greenF >= s_amarillo[1] - 5) && (greenF <= s_amarillo[1] + 5)) && ((blueF >= s_amarillo[2] - 5) && (blueF <= s_amarillo[2] + 5))) {
+      color = 3;
+    }
+    // Compara los valores del sensor con los que corresponden al skittle morado
+    if (((redF >= s_morado[0] - 5) && (redF <= s_morado[0] + 5)) && ((greenF >= s_morado[1] - 5) && (greenF <= s_morado[1] + 5)) && ((blueF >= s_morado[2] - 5) && (blueF <= s_morado[2] + 5))) {
+      color = 4;
+    }
+    // Compara los valores del sensor con los que corresponden al skittle naranja
+    if (((redF >= s_naranja[0] - 5) && (redF <= s_naranja[0] + 5)) && ((greenF >= s_naranja[1] - 5) && (greenF <= s_naranja[1] + 5)) && ((blueF >= s_naranja[2] - 5) && (blueF <= s_naranja[2] + 5))) {
+      color = 5;
+    }
+   } 
+}
